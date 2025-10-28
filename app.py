@@ -54,7 +54,7 @@ def draw_poster(n_blobs, radius, wobble, smoothness, spread, seed):
         x, y = generate_blob(center=(cx, cy), radius=r, wobble=wob, smoothness=smoothness, seed=seed+i)
         ax.fill(x, y, color=color, alpha=0.7, lw=0.5)
     
-    )
+    
     ax.set_xlim(-spread, spread)
     ax.set_ylim(-spread, spread)
     st.pyplot(fig)

@@ -142,7 +142,7 @@ def render_poster(
     info = f"Style: {style.title()} / Shape: {shape_type.title()}"
 
     # Use transform=ax.transAxes so text stays in the same place relative to canvas
-    plt.text(0.01, 0.97, title, fontsize=38, weight="bold",
+    plt.text(0.01, 0.97, title, fontsize=20, weight="bold",
              color=title_color, transform=ax.transAxes, alpha=0.95, va="top")
     plt.text(0.01, 0.93, subtitle, fontsize=16,
              color=title_color, transform=ax.transAxes, alpha=0.9, va="top")

@@ -61,7 +61,7 @@ def draw_poster(
         np.random.seed(seed)
 
     colors = random_palette(n_blobs, seed=seed)
-    fig, ax = plt.subplots(figsize=(7, 7))
+    fig, ax = plt.subplots(figsize=(7, 10))
     ax.set_facecolor(bg_color)
     ax.axis('off')
 

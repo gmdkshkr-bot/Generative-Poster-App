@@ -86,7 +86,7 @@ def draw_poster(
     # Titles
     fig.text(0.03, 0.96, main_title, ha='left', va='top', fontsize=24,
              color=text_color, weight='bold', family='sans-serif')
-    fig.text(0.03, 0.92, subtitle, ha='left', va='top', fontsize=28,
+    fig.text(0.03, 0.92, subtitle, ha='left', va='top', fontsize=18,
              color=text_color, family='sans-serif')
 
     # Params

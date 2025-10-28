@@ -53,31 +53,7 @@ def draw_poster(n_blobs, radius, wobble, smoothness, spread, seed):
         cy = np.sin(angle) * dist
         x, y = generate_blob(center=(cx, cy), radius=r, wobble=wob, smoothness=smoothness, seed=seed+i)
         ax.fill(x, y, color=color, alpha=0.7, lw=0.5)
-    fig.text(
-        0.03, 0.96, main_title,
-        ha='left', va='top',
-        fontsize=18, color='black', weight='bold', family='sans-serif'
-    )
-    fig.text(
-        0.03, 0.92, subtitle,
-        ha='left', va='top',
-        fontsize=12, color='black', weight='normal', family='sans-serif'
-    )
-
-    # --- Parameter annotation (bottom-left corner) --- #
-    param_text = (
-        f"Parameters:\n"
-        f"n_blobs = {n_blobs}\n"
-        f"radius = {radius}\n"
-        f"wobble = {wobble}\n"
-        f"smoothness = {smoothness}\n"
-        f"spread = {spread}\n"
-        f"seed = {seed}"
-    )
-    fig.text(
-        0.97, 0.03, param_text,
-        ha='right', va='bottom',
-        fontsize=9, color='black', alpha=0.85, family='monospace'
+    
     )
     ax.set_xlim(-spread, spread)
     ax.set_ylim(-spread, spread)

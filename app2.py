@@ -1,154 +1,144 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import numpy as np
 import random
+import math
+import numpy as np
+import matplotlib.pyplot as plt
 import io
-from PIL import Image, ImageFilter
+
+# ----------------------------------------------------
+# Original functions from the code are used as is
+# ----------------------------------------------------
+
+def get_palette(mode="pastel", k=5):
+    """
+    Return a palette of k colors based on the chosen mode.
+    Modes: "pastel", "vivid", "neon", "mono", "earth"
+    """
+    palette = []
+    
+    if mode == "pastel":
+        palette = [(0.6 + 0.4*random.random(), 0.6 + 0.4*random.random(), 0.6 + 0.4*random.random()) for _ in range(k)]
+    elif mode == "vivid":
+        palette = [(random.random(), random.random(), random.random()) for _ in range(k)]
+    elif mode == "neon":
+        neon_base = [(1,0,0), (0,1,0), (0,0,1), (1,1,0), (1,0,1), (0,1,1)]
+        palette = [tuple(min(1, c + 0.2*random.random()) for c in random.choice(neon_base)) for _ in range(k)]
+    elif mode == "mono":
+        gray = random.random()
+        palette = [(gray*random.uniform(0.5,1),)*3 for _ in range(k)]
+    elif mode == "earth":
+        earth_colors = [(0.6,0.4,0.2), (0.4,0.3,0.2), (0.5,0.35,0.25), (0.7,0.5,0.3)]
+        palette = [random.choice(earth_colors) for _ in range(k)]
+    else:
+        palette = [(random.random(), random.random(), random.random()) for _ in range(k)]
+    
+    return palette
+
+def shape(center=(0.5,0.5), r=0.1, points=1000, wobble=0.15, kind="blob", sides=random.randint(3,10), petals=random.randint(2,10)):
+    """
+    Generate coordinates for different shapes.
+    kind: "blob", "polygon", "heart", "star", "flower"
+    """
+    t = np.linspace(0, 2*np.pi, points)
+    
+    if kind == "blob":
+        radii = r * (1 + wobble*(np.random.rand(points)-0.5))
+        x = center[0] + radii * np.cos(t)
+        y = center[1] + radii * np.sin(t)
+    elif kind == "polygon":
+        # Random sides are determined each time the function is called.
+        current_sides = random.randint(3, 10)
+        angles = np.linspace(0, 2*np.pi, current_sides + 1)
+        x = center[0] + r * np.cos(angles)
+        y = center[1] + r * np.sin(angles)
+    elif kind == "heart":
+        x = center[0] + r * 16*np.sin(t)**3 / 16
+        y = center[1] + r * (13*np.cos(t) - 5*np.cos(2*t) - 2*np.cos(3*t) - np.cos(4*t)) / 16
+    elif kind == "star":
+        n = 5
+        angles = np.linspace(0, 2*np.pi, 2*n+1)
+        radii = np.array([r, r/2]*n + [r])
+        x = center[0] + radii * np.cos(angles)
+        y = center[1] + radii * np.sin(angles)
+    elif kind == "flower":
+         # Random petals are determined each time the function is called.
+        current_petals = random.randint(3, 10)
+        radii = r * (1 + 0.3 * np.sin(current_petals*t))
+        x = center[0] + radii * np.cos(t)
+        y = center[1] + radii * np.sin(t)
+    else: # fallback to blob
+        radii = r * (1 + wobble*(np.random.rand(points)-0.5))
+        x = center[0] + radii * np.cos(t)
+        y = center[1] + radii * np.sin(t)
+    
+    return x, y
+
+# ----------------------------------------------------
+# Streamlit App UI Section
+# ----------------------------------------------------
 
 st.set_page_config(layout="wide")
+st.title("🎨 Random Theme Abstract Poster Generator")
+st.info("Click the button below to generate a poster with a new theme!")
 
-# ==========================================================
-# Utility Functions
-# ==========================================================
-
-def color_brightness(rgb):
-    return 0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]
-
-def shape(center=(0.5,0.5), r=0.2, points=1000, shape_type="blob", wobble=0.15, n_sides=6):
-    # circle
-    if shape_type == "circle":
-        angles = np.linspace(0,2*np.pi,points)
-        x = center[0] + r*np.cos(angles)
-        y = center[1] + r*np.sin(angles)
-        return x, y
+# Main generation button
+if st.button("✨ Generate New Poster!", type="primary", help="A new theme is applied every time you click."):
     
-    # polygon
-    if shape_type == "polygon":
-        angles = np.linspace(0,2*np.pi,n_sides,endpoint=False)
-        x = center[0] + r*np.cos(angles)
-        y = center[1] + r*np.sin(angles)
-        return np.append(x,x[0]), np.append(y,y[0])
+    # 0. Initialize seed (different art for each button click)
+    random.seed() 
+    
+    # 1. Select random theme (core logic from user's code)
+    style = random.choice(["pastel", "vivid", "neon", "mono", "earth"])
+    blob_shape = random.choice(["blob", "polygon", "heart", "star", "flower"])
 
-    # blob (default)
-    angles = np.linspace(0,2*np.pi,points)
-    wobble_radius = r*(1 + wobble*np.sin(angles*3 + random.random()*np.pi))
-    x = center[0] + wobble_radius*np.cos(angles)
-    y = center[1] + wobble_radius*np.sin(angles)
-    return x,y
+    # Display the generated theme on the screen
+    st.subheader(f"Current Theme: `{style.capitalize()}` Style + `{blob_shape.capitalize()}` Shape")
 
-
-def compute_specular(i,n_layers):
-    # Highlight strongest near top layers
-    return max(0, 1 - (i/(n_layers-1)))**2
-
-def metallic_noise():
-    return np.random.rand()*0.3 + np.random.rand()*0.1
-
-# ==========================================================
-# Render Poster
-# ==========================================================
-def render_poster(
-    bg_color="#222222",
-    base_color="#FFB300",
-    n_layers=7,
-    light_angle=60,
-    wobble=0.12,
-    shape_type="blob",
-    rim_intensity=0.3,
-    specular_intensity=0.4,
-    metallic_strength=0.5,
-    blur_strength=0.5
-):
-    fig, ax = plt.subplots(figsize=(5,7))
-    ax.set_facecolor(bg_color)
-
-    light_rad = np.deg2rad(light_angle)
-
+    # 2. Prepare Matplotlib Figure
+    fig, ax = plt.subplots(figsize=(7, 10))
+    fig.patch.set_facecolor((0, 0, 0)) # Figure entire background color
+    ax.set_facecolor((0, 0, 0))      # Plot area background color
+    ax.axis('off')
+    
+    # 3. Create palette
+    palette = get_palette(mode=style, k=20)
+    n_layers = 30 # Number of layers is fixed at 30 (you can make this random too if you want!)
+    
+    # 4. Draw layers
     for i in range(n_layers):
-        t = i / (n_layers-1)
+        cx, cy = random.random(), random.random()
+        rr = random.uniform(0.01, 0.25)
+        
+        # Pass the selected shape type (blob_shape) as 'kind'
+        x, y = shape(center=(cx, cy), r=rr, wobble=random.uniform(0.05, 0.9), kind=blob_shape)
+        
+        color = random.choice(palette)
+        alpha = random.uniform(0.1, 0.9)
+        edge_color = (random.random(), random.random(), random.random(), 1)
+        
+        ax.fill(x, y, color=color, alpha=alpha, edgecolor=edge_color)
 
-        # radius grad
-        r = 0.33*(1 - 0.1*t)
+    # 5. Add text (changed to white)
+    ax.text(0.05, 0.95, "Generative Poster", fontsize=25, weight='bold', color='white', transform=ax.transAxes)
+    ax.text(0.05, 0.91, "Week 3 • Arts & Advanced Big Data", fontsize=15, color='white', transform=ax.transAxes)
+    # Also display the selected theme on the poster
+    ax.text(0.05, 0.88, f"{style} / {blob_shape}", fontsize=15, color='white', transform=ax.transAxes)
+    
+    # 6. Set canvas range
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
 
-        # center offset
-        cx = 0.5 - 0.05*np.cos(light_rad)*(1-t)
-        cy = 0.5 - 0.05*np.sin(light_rad)*(1-t)
-
-        # polygon side fix
-        n_sides = random.randint(4,9)
-
-        # shadow softness = multiple offset layers
-        for s in range(3):
-            dx = 0.02*s*np.cos(light_rad)
-            dy = 0.02*s*np.sin(light_rad)
-            x_s, y_s = shape((cx+dx,cy+dy), r, shape_type=shape_type, wobble=wobble, n_sides=n_sides)
-            ax.fill(x_s,y_s, color="black", alpha=0.05*(3-s))
-
-        # base layer
-        x,y = shape((cx,cy), r, shape_type=shape_type, wobble=wobble, n_sides=n_sides)
-
-        # metallic roughness noise
-        mr = metallic_strength*metallic_noise()
-
-        # rim light: depends on angle
-        rim = rim_intensity*(1-t)
-
-        # specular highlight
-        spec = specular_intensity*compute_specular(i,n_layers)
-
-        # composite color
-        rgb = np.array(ImageColor.getrgb(base_color))/255
-        rgb = rgb + rim + spec - mr
-        rgb = np.clip(rgb,0,1)
-
-        ax.fill(x,y, color=rgb, alpha=0.42*(1-t+0.3))
-
-    # blur (depth of field)
-    fig.canvas.draw()
-    image = np.array(fig.canvas.renderer._renderer)
-    pil = Image.fromarray(image)
-    pil = pil.filter(ImageFilter.GaussianBlur(radius=blur_strength*6))
-    ax.clear()
-    ax.imshow(pil)
-    ax.axis("off")
-
-    return fig
-
-
-# ==========================================================
-# Streamlit UI
-# ==========================================================
-
-st.sidebar.header("Poster Controls")
-
-bg_color = st.sidebar.color_picker("Background", "#1d1d1d")
-base_color = st.sidebar.color_picker("Base Color", "#fec100")
-shape_type = st.sidebar.selectbox("Shape Type", ["blob","circle","polygon"])
-n_layers = st.sidebar.slider("Layers", 5,15,7)
-wobble = st.sidebar.slider("Blob Wobble",0.0,0.5,0.12)
-light_angle = st.sidebar.slider("Light Angle",0,180,60)
-rim_intensity = st.sidebar.slider("Rim Light",0.0,1.0,0.3)
-specular_intensity = st.sidebar.slider("Specular",0.0,1.0,0.4)
-metallic_strength = st.sidebar.slider("Metallic Roughness",0.0,1.0,0.5)
-blur_strength = st.sidebar.slider("Depth Blur",0.0,1.0,0.5)
-
-# auto render immediately
-fig = render_poster(
-    bg_color,
-    base_color,
-    n_layers,
-    light_angle,
-    wobble,
-    shape_type,
-    rim_intensity,
-    specular_intensity,
-    metallic_strength,
-    blur_strength
-)
-
-st.pyplot(fig)
-
-# download
-buf = io.BytesIO()
-fig.savefig(buf, format="png", dpi=300)
-st.download_button("Download Poster", buf, "poster.png", "image/png")
+    # 7. Display poster in Streamlit
+    st.pyplot(fig)
+    
+    # 8. Prepare image data for download button
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=300, bbox_inches='tight', pad_inches=0, facecolor=fig.get_facecolor())
+    buf.seek(0)
+    
+    st.download_button(
+        label="Download Poster (PNG)",
+        data=buf,
+        file_name=f"poster_{style}_{blob_shape}.png",
+        mime="image/png"
+    )

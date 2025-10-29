@@ -55,18 +55,16 @@ def blob(center=(0.5,0.5), r=0.2, points=1000, wobble=0.15):
     y = center[1] + radii*np.sin(angles)
     return x, y
 
-def shape(center=(0.5,0.5), r=0.2, points=1000, wobble=0.15, shape_type="blob"):
+def shape(center=(0.5,0.5), r=0.2, points=1000, wobble=0.15, shape_type="blob", n_sides=6):
     if shape_type == "circle":
         angles = np.linspace(0,2*np.pi,points)
         x = center[0] + r*np.cos(angles)
         y = center[1] + r*np.sin(angles)
         return x, y
     elif shape_type == "polygon":
-        n_sides = random.randint(3,8)
         angles = np.linspace(0,2*np.pi,n_sides,endpoint=False)
         x = center[0] + r*np.cos(angles)
         y = center[1] + r*np.sin(angles)
-        # ensure closed polygon by repeating first vertex
         return np.append(x,x[0]), np.append(y,y[0])
     else:
         return blob(center,r,points,wobble)
@@ -88,7 +86,6 @@ def render_poster(
     random.seed(seed)
     np.random.seed(seed if seed is not None else None)
 
-    # set matplotlib DPI and size
     dpi = 150
     fig_w = width / dpi
     fig_h = height / dpi
@@ -99,49 +96,58 @@ def render_poster(
 
     palette = random_palette(style, 40)
 
-    # shadow offset direction (light_angle: degrees)
     dx = shadow_offset * math.cos(math.radians(light_angle))
     dy = -shadow_offset * math.sin(math.radians(light_angle))
 
     for i in range(n_layers):
-        # choose center but with better distribution to avoid extreme edges
         cx = random.uniform(0.05, 0.95)
         cy = random.uniform(0.05, 0.95)
         rr = random.uniform(0.02,0.22)
-
-        # rotation
         angle = random.uniform(-rotation_range, rotation_range)
+        n_sides = random.randint(3,8)
 
-        # Shadow — draw same shape type at offset so polygon shadow matches polygon
-        x_s, y_s = shape(center=(cx+dx, cy+dy), r=rr, wobble=wobble, shape_type=shape_type)
-        x_s, y_s = rotate_coords(x_s, y_s, cx+dx, cy+dy, angle)
-        # use a slightly blurred look by layering darker semi-transparent fills
-        plt.fill(x_s, y_s, color=(0,0,0), alpha=0.35, edgecolor=(0,0,0,0))
+        # Soft blurred shadow
+        for j in np.linspace(0, shadow_offset, 4):
+            x_s, y_s = shape(center=(cx+dx*j, cy+dy*j), r=rr, wobble=wobble, shape_type=shape_type, n_sides=n_sides)
+            x_s, y_s = rotate_coords(x_s, y_s, cx+dx*j, cy+dy*j, angle)
+            plt.fill(x_s, y_s, color=(0,0,0), alpha=0.12, edgecolor=(0,0,0,0))
 
-        # Actual shape
-        x, y = shape(center=(cx,cy), r=rr, wobble=wobble, shape_type=shape_type)
+        # Body
+        x, y = shape(center=(cx,cy), r=rr, wobble=wobble, shape_type=shape_type, n_sides=n_sides)
         x, y = rotate_coords(x, y, cx, cy, angle)
         base_color = np.array(random.choice(palette))
-        brightness_factor = 0.75 + brightness_strength*(i / max(1, n_layers))
+
+        # Depth-of-Field blur (faint)
+        blur_factor = i / n_layers
+        base_color = base_color * (1 - 0.08 * blur_factor)
+
+        brightness_factor = 0.75 + brightness_strength*(i / n_layers)
         color = np.clip(base_color * brightness_factor, 0, 1)
         alpha = random.uniform(alpha_min, alpha_max)
         plt.fill(x, y, color=color, alpha=alpha, edgecolor=(0,0,0,0))
 
-    # Text contrast fix: ensure title_color contrasts with background
+        # Rim Light
+        plt.plot(x, y, color=(1,1,1), alpha=0.12, linewidth=2)
+
+        # Specular highlight
+        highlight_shift = 0.008
+        x_h = x + highlight_shift*np.cos(math.radians(light_angle))
+        y_h = y - highlight_shift*np.sin(math.radians(light_angle))
+        plt.plot(x_h, y_h, color=(1,1,1), alpha=0.08, linewidth=3)
+
     bg_rgb = tuple(int(background.lstrip("#")[i:i+2],16)/255 for i in (0,2,4))
     try:
         text_rgb = tuple(int(title_color.lstrip("#")[i:i+2],16)/255 for i in (0,2,4))
     except Exception:
         text_rgb = (0,0,0)
+
     if abs(luminance(bg_rgb) - luminance(text_rgb)) < 0.5:
         title_color = "#FFFFFF" if luminance(bg_rgb) < 0.5 else "#000000"
 
-    # Draw persistent top-left title & subtitle (always on top of layers)
-    title = "3D like Generative Poster"
+    title = "3D like Generative Poster Enhanced"
     subtitle = "Week 4 • Arts & Big Data"
     info = f"Style: {style.title()} / Shape: {shape_type.title()}"
 
-    # Use transform=ax.transAxes so text stays in the same place relative to canvas
     plt.text(0.01, 0.97, title, fontsize=20, weight="bold",
              color=title_color, transform=ax.transAxes, alpha=0.95, va="top")
     plt.text(0.01, 0.93, subtitle, fontsize=16,
@@ -190,7 +196,7 @@ with st.sidebar:
     else:
         seed_val = int(seed)
 
-# Render button (avoid rerender spamming)
+# Render button
 if st.button("Generate Poster"):
     with st.spinner("Rendering..."):
         poster_bytes = render_poster(
@@ -202,7 +208,6 @@ if st.button("Generate Poster"):
         )
         st.image(poster_bytes, use_column_width=True)
 
-        # Download button
         st.download_button(
             label="Download PNG",
             data=poster_bytes,

@@ -78,7 +78,7 @@ def shape(center=(0.5,0.5), r=0.1, points=1000, wobble=0.15, kind="blob", sides=
 # ----------------------------------------------------
 
 st.set_page_config(layout="wide")
-st.title("🎨 Random Theme Abstract Poster Generator")
+st.title("Generative Abstract Poster with Variety Style and Shape")
 st.info("Click the button below to generate a poster with a new theme!")
 
 # Main generation button
